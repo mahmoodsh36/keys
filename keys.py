@@ -46,16 +46,34 @@ bindings = [
         "action": lambda: print('launching terminal'),
     },
     {
-        "sequence": ["mod(leftmeta)", "x", "k"],
-        "action": lambda: run_cmd('kill_process.sh'),
-    },
-    {
         "sequence": ["mod(leftmeta)", "x", "c", "1"],
         "action": lambda: print('reached 1'),
     },
+
+    # programs/scripts
     {
         "sequence": ["mod(leftmeta)", "r"],
         "action": lambda: run_cmd('run.sh'),
+    },
+    {
+        "sequence": ["mod(leftmeta)", "x", "k"],
+        "action": lambda: (print('kill process'), run_cmd('kill_process.sh')),
+    },
+    {
+        "sequence": ["mod(leftmeta)", "x", "w"],
+        "action": lambda: run_cmd('firefox'),
+    },
+    {
+        "sequence": ["mod(leftmeta)", "x", "e"],
+        "action": lambda: run_cmd('emacs'),
+    },
+    {
+        "sequence": ["mod(leftmeta)", "x", "b"],
+        "action": lambda: run_cmd('web_bookmarks.sh'),
+    },
+    {
+        "sequence": ["mod(leftmeta)", "x", "o"],
+        "action": lambda: run_cmd('terminal_with_cmd.sh top'),
     },
 ]
 
@@ -84,6 +102,7 @@ class MyKey:
         self.keycode = keycode
         self.scancode = scancode
         self.keystate = keystate
+        self.forwarded = True # whether to write it
 
     def is_held(self):
         return self.keystate != 'up'
@@ -143,12 +162,11 @@ class KeySequence():
         # if its not a modifier key, we check if it requires a modifier key
         # and if so we check whether that modifier key is still active (held)
         if not ismod(expected) and self.progress_idx > 0:
-            prev_expected = self.sequence[self.progress_idx - 1]
-            if ismod(prev_expected):
-                expected_mod = unmod(prev_expected)
+            prev = self.sequence[self.progress_idx - 1]
+            if ismod(prev):
                 # TODO: optimize this
                 for histkey in reversed(history):
-                    if histkey.code() == expected_mod:
+                    if histkey.code() == unmod(prev):
                         if not histkey.is_held():
                             return False
                         break
@@ -157,14 +175,18 @@ class KeySequence():
                 # if we have two normal keys in a row, then the second shouldnt have
                 # any modifiers, here we check if any modifiers are held and if so
                 # we discard this sequence
-                for histkey in reversed(history):
-                    for key in self.sequence[0:self.progress_idx]:
-                        if ismod(key):
-                            # TODO: optimize this
-                            for histkey in reversed(history):
-                                if histkey.code() == unmod(key):
-                                    if histkey.is_held():
-                                        return False
+                i = 1
+                prev = self.sequence[self.progress_idx - i]
+                while ismod(prev) and self.progress_idx - i >= 0:
+                    for histkey in reversed(history):
+                        if histkey.code() == unmod(prev):
+                            if histkey.is_held():
+                                return False
+                            break
+                    i += 1
+                    prev = self.sequence(self.progress_id - i)
+                print(key)
+                key.forwarded = False
 
         self.progress_idx += 1
 
@@ -180,34 +202,40 @@ class KeySequence():
 def handlekey(key):
     """main function that handles each key event"""
     global active
+    global history
 
     keystate = key.keystate
     keycode = key.keycode
     scancode = key.scancode
 
     # handle key remapping
-    towrite = scancode
+    code_towrite = scancode
     for remap in remaps:
         if normalize(keycode) == remap['src']:
-            towrite = e.ecodes[unnormalize(remap['dest'])]
+            code_towrite = e.ecodes[unnormalize(remap['dest'])]
 
-    ui.write(e.EV_KEY, towrite, keystate)
-    ui.syn()
+    towrite = True
 
     # handle key up
     if keystate == evdev.events.KeyEvent.key_up:
         # TODO: needs to be optimized
-        for histkey in history:
+        for histkey in reversed(history):
             if histkey.keycode == keycode:
                 histkey.keystate = "up"
+                if not histkey.forwarded:
+                    towrite = False
+                break
 
     # handle key down
     if keystate == evdev.events.KeyEvent.key_hold:
         strstate = "hold"
         # TODO: needs to be optimized
-        for histkey in history:
+        for histkey in reversed(history):
             if histkey.keycode == keycode:
                 histkey.keystate = "hold"
+                if not histkey.forwarded:
+                    towrite = False
+                break
 
     if keystate == evdev.events.KeyEvent.key_down:
         mykey = MyKey(keycode, scancode, "down")
@@ -232,6 +260,17 @@ def handlekey(key):
             if seq.progress(mykey):
                 newactive.append(seq)
         active = newactive
+
+        # clear history when no sequences are dependent on it
+        # if not active:
+            # history = []
+
+        if not mykey.forwarded:
+            towrite = False
+
+    if towrite:
+        ui.write(e.EV_KEY, code_towrite, keystate)
+        ui.syn()
 
     return True
 
