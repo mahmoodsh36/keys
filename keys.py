@@ -2,6 +2,8 @@ import evdev
 from evdev import UInput, ecodes as e
 import subprocess
 
+MAX_HIST_SIZE = 10
+
 kbd_path = '/dev/input/event0'
 try:
     kbd_path = subprocess.check_output("libinput_find_keyboard.sh", shell=True).decode().strip()
@@ -75,6 +77,15 @@ bindings = [
         "sequence": ["mod(leftmeta)", "x", "o"],
         "action": lambda: run_cmd('terminal_with_cmd.sh top'),
     },
+    {
+        "sequence": ["mod(leftmeta)", "x", "p"],
+        "action": lambda: run_cmd('terminal_with_cmd.sh pulsemixer'),
+    },
+    {
+        "sequence": ["mod(leftmeta)", "x", "i"],
+        "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t | sxiv -i'),
+    },
+
 ]
 
 # check evdev.ecodes.ecodes for all options, we ommit KEY_ and downcase
@@ -122,14 +133,26 @@ class KeySequence():
     def progress(self, key):
         """receive a key and decide how to progress, return whether the sequence
         should continue picking up keys or should terminate because it cant be
-        satisfied"""
+        satisfied.
+        the return values are:
+        0 for sequence not satisfied
+        1 for sequence needs to continue receiving keys
+        2 for sequence done"""
         # if the key isnt the one we're expecting we abort this sequence
         expected = self.left()[0]
         if ismod(expected):
             if key.code() != unmod(expected):
-                return False
+                satisfied = False
+                for histkey in reversed(history):
+                    if histkey.code() == unmod(expected) and histkey.is_held():
+                        self.progress_idx += 1
+                        satisfied = True
+                        break
+                if satisfied:
+                    return self.progress(key)
+                return 0
         elif key.code() != expected:
-            return False
+            return 0
 
         seq = self.left()
         # for i, seqkey in enumerate(seq):
@@ -159,17 +182,22 @@ class KeySequence():
         #         satisfied = False
         # if satisfied:
         #     print('invoking ', seq)
+
         # if its not a modifier key, we check if it requires a modifier key
         # and if so we check whether that modifier key is still active (held)
         if not ismod(expected) and self.progress_idx > 0:
-            prev = self.sequence[self.progress_idx - 1]
+            i = 1
+            prev = self.sequence[self.progress_idx - i]
             if ismod(prev):
-                # TODO: optimize this
-                for histkey in reversed(history):
-                    if histkey.code() == unmod(prev):
-                        if not histkey.is_held():
-                            return False
-                        break
+                while ismod(prev) and i <= len(self.sequence):
+                    # TODO: optimize this
+                    for histkey in reversed(history):
+                        if histkey.code() == unmod(prev):
+                            if not histkey.is_held():
+                                return 0
+                            break
+                    i += 1
+                    prev = self.sequence[self.progress_idx - i]
             else:
                 # TODO: optimize this
                 # if we have two normal keys in a row, then the second shouldnt have
@@ -181,11 +209,10 @@ class KeySequence():
                     for histkey in reversed(history):
                         if histkey.code() == unmod(prev):
                             if histkey.is_held():
-                                return False
+                                return 0
                             break
                     i += 1
                     prev = self.sequence(self.progress_id - i)
-                print(key)
                 key.forwarded = False
 
         self.progress_idx += 1
@@ -194,10 +221,10 @@ class KeySequence():
         # and return False to get the sequence removed.
         if self.progress_idx == len(self.sequence):
             self.action()
-            return False
+            return 2
 
         # return true to let this sequence continue progressing
-        return True
+        return 1
 
 def handlekey(key):
     """main function that handles each key event"""
@@ -246,24 +273,41 @@ def handlekey(key):
         if 'force4stop' in all:
             return False # exit
 
-        # check if we have any satisfied keybindings
+        # we need to keep track of the ones we just finished to avoid
+        # S-r (or the likes) from being invoked twice
+        done = []
+
+        # we drop sequences that shouldnt progress (they return 0)
+        newactive = []
+        for seq in active:
+            result = seq.progress(mykey)
+            if result == 1:
+                newactive.append(seq)
+            if result == 2:
+                done.append(seq)
+        active = newactive
+
+        # check if we have any keybindings that start with this key
         for binding in bindings:
             seq = binding['sequence']
             # if the key is the first in any sequence:
-            first = seq[0]
-            if mykey.code() == first or mykey.code() == unmod(first):
-                newseq = KeySequence(binding['sequence'], binding['action'])
-                active.append(newseq)
-
-        newactive = []
-        for seq in active:
-            if seq.progress(mykey):
-                newactive.append(seq)
-        active = newactive
+            newseq = KeySequence(binding['sequence'], binding['action'])
+            tostart = True
+            for activeseq in active:
+                if activeseq.sequence == seq:
+                    tostart = False
+            for doneseq in done:
+                if doneseq.sequence == seq:
+                    tostart = False
+            if tostart:
+                if newseq.progress(mykey) == 1:
+                    active.append(newseq)
 
         # clear history when no sequences are dependent on it
         # if not active:
-            # history = []
+        #     history = []
+
+        history = history[-MAX_HIST_SIZE:]
 
         if not mykey.forwarded:
             towrite = False
@@ -290,8 +334,10 @@ def main():
                 # print(evdev.categorize(event))
                 if not handlekey(k):
                     break
-    except (KeyboardInterrupt, SystemExit, OSError, Exception) as e:
+    except Exception as e:
         print(e)
+        myexit()
+    except (KeyboardInterrupt, SystemExit, OSError) as e:
         print('exiting')
         myexit()
 
