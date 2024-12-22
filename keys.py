@@ -2,7 +2,7 @@ import evdev
 from evdev import UInput, ecodes as e
 import subprocess
 
-MAX_HIST_SIZE = 10
+MAX_HIST_SIZE = 25
 
 kbd_path = '/dev/input/event0'
 try:
