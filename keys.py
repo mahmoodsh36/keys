@@ -190,7 +190,6 @@ class KeySequence():
             prev = self.sequence[self.progress_idx - i]
             if ismod(prev):
                 while ismod(prev) and i <= len(self.sequence):
-                    # TODO: optimize this
                     for histkey in reversed(history):
                         if histkey.code() == unmod(prev):
                             if not histkey.is_held():
@@ -199,20 +198,16 @@ class KeySequence():
                     i += 1
                     prev = self.sequence[self.progress_idx - i]
             else:
-                # TODO: optimize this
                 # if we have two normal keys in a row, then the second shouldnt have
                 # any modifiers, here we check if any modifiers are held and if so
                 # we discard this sequence
-                i = 1
-                prev = self.sequence[self.progress_idx - i]
-                while ismod(prev) and self.progress_idx - i >= 0:
-                    for histkey in reversed(history):
-                        if histkey.code() == unmod(prev):
-                            if histkey.is_held():
-                                return 0
-                            break
-                    i += 1
-                    prev = self.sequence(self.progress_id - i)
+                for prev in self.sequence[:self.progress_idx]:
+                    if ismod(prev):
+                        for histkey in reversed(history):
+                            if histkey.code() == unmod(prev):
+                                if histkey.is_held():
+                                    return 0
+                                break
                 key.forwarded = False
 
         self.progress_idx += 1
