@@ -45,7 +45,7 @@ def unmod(key):
 bindings = [
     {
         "sequence": ["mod(leftmeta)", "enter"],
-        "action": lambda: print('launching terminal'),
+        "action": lambda: run_cmd('kitty'),
     },
     {
         "sequence": ["mod(leftmeta)", "x", "c", "1"],
