@@ -45,7 +45,7 @@ def unmod(key):
 bindings = [
     {
         "sequence": ["mod(leftmeta)", "enter"],
-        "action": lambda: run_cmd('kitty'),
+        "action": lambda: run_cmd('wezterm'),
     },
     {
         "sequence": ["mod(leftmeta)", "x", "c", "1"],
@@ -85,7 +85,10 @@ bindings = [
         "sequence": ["mod(leftmeta)", "x", "i"],
         "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t | sxiv -i'),
     },
-
+    {
+        "sequence": ["mod(leftmeta)", "x", "a"],
+        "action": lambda: run_cmd(""" HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl instances | head -1 | cut -d " " -f2 | tr -d ":") sh -c "cd ~/work/widgets; nix-shell --run \\"python bar.py\\"" """),
+    },
 ]
 
 # check evdev.ecodes.ecodes for all options, we ommit KEY_ and downcase
