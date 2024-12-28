@@ -267,9 +267,10 @@ def handlekey(key):
 
         history = history[-MAX_HIST_SIZE:]
 
+        if not mykey.forwarded:
+            towrite = False
         if not mykey.forwarded and not was_handled:
             was_handled = False
-            towrite = False
             trapped.append(mykey)
 
     if towrite:
