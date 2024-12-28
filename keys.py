@@ -2,6 +2,9 @@ import evdev
 from evdev import UInput, ecodes as e
 import subprocess
 
+from utils import *
+from config import *
+
 MAX_HIST_SIZE = 25
 
 kbd_path = '/dev/input/event0'
@@ -15,100 +18,20 @@ except:
 ui = UInput()
 # for capturing manual input
 device = evdev.InputDevice(kbd_path)
-print("Using device " + device.path + ' ' + device.name)
+print("using device " + device.path + ' ' + device.name)
 
 # key press history
 history = []
 active = []
-
-def run_cmd(cmd):
-    subprocess.Popen(
-        f"su mahmooz -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland XDG_RUNTIME_DIR=/run/user/1000 {cmd}'",
-        shell=True,
-        start_new_session=True
-    )
-
-def mod(key):
-    """use key as modifier"""
-    return f"mod({key})"
-
-def ismod(key):
-    """check if key is used as a modifier"""
-    return "mod" in key
-
-def unmod(key):
-    """remove mod() from around a key"""
-    if not ismod(key):
-        return key
-    return key[4:].split(')')[0]
-
-bindings = [
-    {
-        "sequence": ["mod(leftmeta)", "enter"],
-        "action": lambda: run_cmd('wezterm'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "c", "1"],
-        "action": lambda: print('reached 1'),
-    },
-
-    # programs/scripts
-    {
-        "sequence": ["mod(leftmeta)", "r"],
-        "action": lambda: run_cmd('run.sh'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "k"],
-        "action": lambda: (print('kill process'), run_cmd('kill_process.sh')),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "w"],
-        "action": lambda: run_cmd('firefox'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "e"],
-        "action": lambda: run_cmd('emacs'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "b"],
-        "action": lambda: run_cmd('web_bookmarks.sh'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "o"],
-        "action": lambda: run_cmd('terminal_with_cmd.sh top'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "p"],
-        "action": lambda: run_cmd('terminal_with_cmd.sh pulsemixer'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "i"],
-        "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t | sxiv -i'),
-    },
-    {
-        "sequence": ["mod(leftmeta)", "x", "a"],
-        "action": lambda: run_cmd(""" HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl instances | head -1 | cut -d " " -f2 | tr -d ":") sh -c "cd ~/work/widgets; nix-shell --run \\"python bar.py\\"" """),
-    },
-]
-
-# check evdev.ecodes.ecodes for all options, we ommit KEY_ and downcase
-# also evdev.ecodes.KEY
-remaps = [
-    {
-        "src": 'capslock',
-        "dest": 'esc',
-    },
-    {
-        "src": 'rightalt',
-        "dest": 'leftctrl',
-    },
-]
+trapped = []
 
 def normalize(code):
     """normalize the code of a key"""
     return code.lower().replace('key_', '')
 
 def unnormalize(code):
+    if ismod(code):
+        code = unmod(code)
     return f'KEY_{code.upper()}'
 
 class MyKey:
@@ -152,9 +75,12 @@ class KeySequence():
                         satisfied = True
                         break
                 if satisfied:
+                    # key.forwarded = False
                     return self.progress(key)
                 return 0
+            # key.forwarded = False
         elif key.code() != expected:
+            # key.forwarded = False
             return 0
 
         seq = self.left()
@@ -218,16 +144,49 @@ class KeySequence():
         # if we have reached the end of the sequence, execute the destined action
         # and return False to get the sequence removed.
         if self.progress_idx == len(self.sequence):
-            self.action()
+            print(self.action)
+            if self.action == "reload":
+                print('reloading config')
+                reload()
+            elif isinstance(self.action, list):
+                print('invoking sequence ', self.action)
+                writeseq(self.action)
+            else:
+                self.action()
             return 2
 
         # return true to let this sequence continue progressing
         return 1
 
+def writeseq(seq):
+    from time import sleep
+    held = []
+    prev = None
+    for key in seq:
+        is_prev_mod = prev and ismod(prev)
+        code_towrite = e.ecodes[unnormalize(key)]
+        if ismod(key):
+            ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
+            held.append(key)
+            ui.syn()
+        else:
+            ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
+            ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
+            for heldkey in held:
+                ui.write(e.EV_KEY,
+                         e.ecodes[unnormalize(heldkey)],
+                         evdev.events.KeyEvent.key_up)
+            held = []
+            ui.syn()
+        rev = key
+        # is this necessary to let apps process things?
+        sleep(0.05)
+
 def handlekey(key):
     """main function that handles each key event"""
     global active
     global history
+    global trapped
 
     keystate = key.keystate
     keycode = key.keycode
@@ -240,6 +199,7 @@ def handlekey(key):
             code_towrite = e.ecodes[unnormalize(remap['dest'])]
 
     towrite = True
+    was_handled = False
 
     # handle key up
     if keystate == evdev.events.KeyEvent.key_up:
@@ -283,6 +243,7 @@ def handlekey(key):
                 newactive.append(seq)
             if result == 2:
                 done.append(seq)
+                was_handled = True
         active = newactive
 
         # check if we have any keybindings that start with this key
@@ -307,14 +268,36 @@ def handlekey(key):
 
         history = history[-MAX_HIST_SIZE:]
 
-        if not mykey.forwarded:
+        if not mykey.forwarded and not was_handled:
+            was_handled = False
             towrite = False
+            trapped.append(mykey)
 
     if towrite:
         ui.write(e.EV_KEY, code_towrite, keystate)
         ui.syn()
 
+    # if something was done, dispose the trapped sequence
+    if was_handled:
+        trapped = []
+    # if it wasnt handled and we have no sequences that we expect will handle it,
+    # we forward the entire sequence, perhaps some other app will make use of it.
+    # we do this instead of disposing the sequences that arent satisfied so that
+    # other apps can make use of the same patterns and modifiers (but not the
+    # exact same keybindings ofc.)
+    if trapped and not active:
+        print('forwarding trapped sequence')
+        print([key.code() for key in trapped])
+        writeseq([key.code() for key in trapped])
+        trapped = []
+
     return True
+
+def reload():
+    import importlib
+    import config
+    importlib.reload(config)
+    from config import bindings, remaps
 
 def myexit():
     device.ungrab()
