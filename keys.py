@@ -315,11 +315,11 @@ def main():
                 # print(evdev.categorize(event))
                 if not handlekey(k):
                     break
-    except Exception as e:
-        print(e)
-        myexit()
     except (KeyboardInterrupt, SystemExit, OSError) as e:
         print('exiting')
+        myexit()
+    except Exception as e:
+        print(e)
         myexit()
 
     print('exiting2')
