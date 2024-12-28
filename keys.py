@@ -144,7 +144,6 @@ class KeySequence():
         # if we have reached the end of the sequence, execute the destined action
         # and return False to get the sequence removed.
         if self.progress_idx == len(self.sequence):
-            print(self.action)
             if self.action == "reload":
                 print('reloading config')
                 reload()
@@ -288,7 +287,7 @@ def handlekey(key):
     if trapped and not active:
         print('forwarding trapped sequence')
         print([key.code() for key in trapped])
-        writeseq([key.code() for key in trapped])
+        # writeseq([key.code() for key in trapped])
         trapped = []
 
     return True
