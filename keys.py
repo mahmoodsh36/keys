@@ -5,7 +5,7 @@ import subprocess
 from utils import *
 from config import *
 
-MAX_HIST_SIZE = 25
+MAX_HIST_SIZE = 250
 
 kbd_path = '/dev/input/event0'
 try:
@@ -33,6 +33,16 @@ def unnormalize(code):
     if ismod(code):
         code = unmod(code)
     return f'KEY_{code.upper()}'
+
+def is_held(keycode_normalized):
+    last = last_occur(keycode_normalized)
+    return last and last.is_held()
+
+def last_occur(keycode_normalized):
+    """last occurance of a key in history"""
+    for histkey in reversed(history):
+        if histkey.code() == keycode_normalized:
+            return histkey
 
 class MyKey:
     def __init__(self, keycode, scancode, keystate):
@@ -69,18 +79,24 @@ class KeySequence():
         if ismod(expected):
             if key.code() != unmod(expected):
                 satisfied = False
-                for histkey in reversed(history):
-                    if histkey.code() == unmod(expected) and histkey.is_held():
-                        self.progress_idx += 1
-                        satisfied = True
-                        break
+                last = last_occur(unmod(expected))
+                if last and last.is_held():
+                    self.progress_idx += 1
+                    satisfied = True
+                # for histkey in reversed(history):
+                #     if histkey.code() == unmod(expected) and histkey.is_held():
+                #         self.progress_idx += 1
+                #         satisfied = True
+                #         break
                 if satisfied:
                     # key.forwarded = False
                     return self.progress(key)
                 return 0
-            # key.forwarded = False
+            else:
+                key.forwarded = False
         elif key.code() != expected:
-            # key.forwarded = False
+            if self.progress_idx > 0:
+                key.forwarded = False
             return 0
 
         seq = self.left()
@@ -119,24 +135,31 @@ class KeySequence():
             prev = self.sequence[self.progress_idx - i]
             if ismod(prev):
                 while ismod(prev) and i <= len(self.sequence):
-                    for histkey in reversed(history):
-                        if histkey.code() == unmod(prev):
-                            if not histkey.is_held():
-                                return 0
-                            break
+                    last = last_occur(unmod(prev))
+                    if last and not last.is_held():
+                        return 0
+                    # for histkey in reversed(history):
+                    #     if histkey.code() == unmod(prev):
+                    #         if not histkey.is_held():
+                    #             return 0
+                    #         break
                     i += 1
                     prev = self.sequence[self.progress_idx - i]
+                key.forwarded = False
             else:
                 # if we have two normal keys in a row, then the second shouldnt have
                 # any modifiers, here we check if any modifiers are held and if so
                 # we discard this sequence
                 for prev in self.sequence[:self.progress_idx]:
                     if ismod(prev):
-                        for histkey in reversed(history):
-                            if histkey.code() == unmod(prev):
-                                if histkey.is_held():
-                                    return 0
-                                break
+                        last = last_occur(unmod(prev))
+                        if last and last.is_held():
+                            return 0
+                        # for histkey in reversed(history):
+                        #     if histkey.code() == unmod(prev):
+                        #         if histkey.is_held():
+                        #             return 0
+                        #         break
                 key.forwarded = False
 
         self.progress_idx += 1
@@ -179,7 +202,22 @@ def writeseq(seq):
             ui.syn()
         rev = key
         # is this necessary to let apps process things?
-        sleep(0.05)
+        sleep(0.1)
+
+def write_raw_seq(seq):
+    from time import sleep
+    for key in seq:
+        if key.keystate == 'down':
+            event_towrite = evdev.events.KeyEvent.key_down
+        if key.keystate == 'up':
+            event_towrite = evdev.events.KeyEvent.key_up
+        if key.keystate == 'hold':
+            event_towrite = evdev.events.KeyEvent.key_hold
+        code_towrite = e.ecodes[unnormalize(key.code())]
+        ui.write(e.EV_KEY, code_towrite, event_towrite)
+        ui.syn()
+    # is this necessary to let apps process things?
+    # sleep(0.05)
 
 def handlekey(key):
     """main function that handles each key event"""
@@ -200,35 +238,49 @@ def handlekey(key):
     towrite = True
     was_handled = False
 
+    mykey = MyKey(keycode, scancode, None)
+
     # handle key up
     if keystate == evdev.events.KeyEvent.key_up:
-        # TODO: needs to be optimized
-        for histkey in reversed(history):
-            if histkey.keycode == keycode:
-                histkey.keystate = "up"
-                if not histkey.forwarded:
-                    towrite = False
-                break
+        mykey.keystate = "up"
+        last = last_occur(mykey.code())
+        if last:
+            if not last.forwarded and not last in trapped:
+                towrite = False
+        # for histkey in reversed(history):
+        #     if histkey.keycode == keycode:
+        #         histkey.keystate = "up"
+        #         if not histkey.forwarded:
+        #             towrite = False
+        #         break
 
-    # handle key down
-    if keystate == evdev.events.KeyEvent.key_hold:
-        strstate = "hold"
-        # TODO: needs to be optimized
-        for histkey in reversed(history):
-            if histkey.keycode == keycode:
-                histkey.keystate = "hold"
-                if not histkey.forwarded:
-                    towrite = False
-                break
-
-    if keystate == evdev.events.KeyEvent.key_down:
-        mykey = MyKey(keycode, scancode, "down")
         history.append(mykey)
 
+    # handle key hold
+    if keystate == evdev.events.KeyEvent.key_hold:
+        mykey.keystate = "hold"
+        last = last_occur(mykey.code())
+        if last:
+            if not last.forwarded:
+                towrite = False
+        # TODO: needs to be optimized
+        # for histkey in reversed(history):
+        #     if histkey.keycode == keycode:
+        #         histkey.keystate = "hold"
+        #         if not histkey.forwarded:
+        #             towrite = False
+        #         break
+
+        history.append(mykey)
+
+    # handle key down
+    if keystate == evdev.events.KeyEvent.key_down:
         # exit unconditionally
-        all = "".join([histkey.code() for histkey in history])
+        all = "".join([histkey.code() for histkey in history if histkey.keystate == "down"]) + mykey.code()
         if 'force4stop' in all:
             return False # exit
+
+        mykey.keystate = "down"
 
         # we need to keep track of the ones we just finished to avoid
         # S-r (or the likes) from being invoked twice
@@ -261,17 +313,12 @@ def handlekey(key):
                 if newseq.progress(mykey) == 1:
                     active.append(newseq)
 
-        # clear history when no sequences are dependent on it
-        # if not active:
-        #     history = []
+        history.append(mykey)
 
-        history = history[-MAX_HIST_SIZE:]
-
-        if not mykey.forwarded:
-            towrite = False
-        if not mykey.forwarded and not was_handled:
-            was_handled = False
-            trapped.append(mykey)
+    if not mykey.forwarded:
+        towrite = False
+    if not mykey.forwarded and not was_handled:
+        trapped.append(mykey)
 
     if towrite:
         ui.write(e.EV_KEY, code_towrite, keystate)
@@ -285,11 +332,30 @@ def handlekey(key):
     # we do this instead of disposing the sequences that arent satisfied so that
     # other apps can make use of the same patterns and modifiers (but not the
     # exact same keybindings ofc.)
-    if trapped and not active:
+    # is all_up necessary?
+    all_up = True
+    for histkey in reversed(history):
+        last = last_occur(histkey.code())
+        if last.keystate != 'up':
+            all_up = False
+    if trapped and not active and mykey.keystate == 'up' and all_up:
+        seqtowrite = []
+        start_idx = len(history)
+        # end_idx = 0
+        for trapped_key in trapped:
+            for i, histkey in enumerate(history):
+                if trapped_key == histkey:
+                    if i < start_idx:
+                        start_idx = i
+                    # if i > end_idx:
+                    #     end_idx = i
         print('forwarding trapped sequence')
-        print([key.code() for key in trapped])
-        # writeseq([key.code() for key in trapped])
+        # print([key.code() for key in trapped])
+        print([(key.code(), key.keystate) for key in history[start_idx:]])
+        write_raw_seq([key for key in history[start_idx:]])
         trapped = []
+
+    history = history[-MAX_HIST_SIZE:]
 
     return True
 
@@ -318,9 +384,9 @@ def main():
     except (KeyboardInterrupt, SystemExit, OSError) as e:
         print('exiting')
         myexit()
-    except Exception as e:
-        print(e)
-        myexit()
+    # except Exception as e:
+    #     print(e)
+    #     myexit()
 
     print('exiting2')
     myexit()

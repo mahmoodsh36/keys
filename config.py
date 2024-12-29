@@ -6,11 +6,9 @@ bindings = [
         "action": lambda: run_cmd('wezterm'),
     },
     {
-        "sequence": ["mod(leftmeta)", "x", "c", "1"],
+        "sequence": [mod("leftmeta"), "x", "c", "1"],
         "action": lambda: print('reached 1'),
     },
-
-    # programs/scripts
     {
         "sequence": ["mod(leftmeta)", "r"],
         "action": lambda: run_cmd('run.sh'),
@@ -54,6 +52,10 @@ bindings = [
     {
         "sequence": ["mod(leftmeta)", "x", "t"],
         "action": [mod("leftctrl"), "c", "h", "e", "l", "l", "o"],
+    },
+    {
+        "sequence": ["rightshift"],
+        "action": [mod("leftctrl"), "space"],
     },
 ]
 
