@@ -56,7 +56,11 @@ class MyKey:
         return self.keystate != 'up'
 
     def code(self):
-        return normalize(self.keycode)
+        original = normalize(self.keycode)
+        myremap = remapped(original)
+        if myremap:
+            return myremap
+        return original
 
 class KeySequence():
     def __init__(self, sequence, action):
@@ -226,6 +230,12 @@ def all_up():
         if last.keystate != 'up':
             return False
     return True
+
+def remapped(keycode_normalized):
+    for remap in remaps:
+        if keycode_normalized == remap['src']:
+            return remap['dest']
+    return None
 
 def handlekey(key):
     """main function that handles each key event"""
