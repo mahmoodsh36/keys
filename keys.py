@@ -88,13 +88,7 @@ class KeySequence():
                 if last and last.is_held():
                     self.progress_idx += 1
                     satisfied = True
-                # for histkey in reversed(history):
-                #     if histkey.code() == unmod(expected) and histkey.is_held():
-                #         self.progress_idx += 1
-                #         satisfied = True
-                #         break
                 if satisfied:
-                    # key.forwarded = False
                     return self.progress(key)
                 return 0
             else:
@@ -105,33 +99,6 @@ class KeySequence():
             return 0
 
         seq = self.left()
-        # for i, seqkey in enumerate(seq):
-        #     j = len(history) - len(seq) + i
-        #     if len(history) >= len(seq):
-        #         if ismod(seqkey):
-        #             seqkey = unmod(seqkey)
-        #             found_mod_in_hist = False
-        #             for histkey in reversed(history):
-        #                 if histkey.code() == seqkey:
-        #                     print(histkey.keystate)
-        #                     found_mod_in_hist = True
-        #                     if not histkey.is_held():
-        #                         print(8)
-        #                         satisfied = False
-        #                     break
-        #             if not found_mod_in_hist:
-        #                 print('8')
-        #                 satisfied = False
-        #         else:
-        #             histkey = history[j]
-        #             if histkey.code() != seqkey:
-        #                 print(4)
-        #                 satisfied = False
-        #     else:
-        #         print(3)
-        #         satisfied = False
-        # if satisfied:
-        #     print('invoking ', seq)
 
         # if its not a modifier key, we check if it requires a modifier key
         # and if so we check whether that modifier key is still active (held)
@@ -143,11 +110,6 @@ class KeySequence():
                     last = last_occur(unmod(prev))
                     if last and not last.is_held():
                         return 0
-                    # for histkey in reversed(history):
-                    #     if histkey.code() == unmod(prev):
-                    #         if not histkey.is_held():
-                    #             return 0
-                    #         break
                     i += 1
                     prev = self.sequence[self.progress_idx - i]
                 key.forwarded = False
@@ -160,11 +122,6 @@ class KeySequence():
                         last = last_occur(unmod(prev))
                         if last and last.is_held():
                             return 0
-                        # for histkey in reversed(history):
-                        #     if histkey.code() == unmod(prev):
-                        #         if histkey.is_held():
-                        #             return 0
-                        #         break
                 key.forwarded = False
 
         self.progress_idx += 1
@@ -268,12 +225,6 @@ def handlekey(key):
         if last:
             if not last.forwarded and not last in trapped and not after_trap:
                 towrite = False
-        # for histkey in reversed(history):
-        #     if histkey.keycode == keycode:
-        #         histkey.keystate = "up"
-        #         if not histkey.forwarded:
-        #             towrite = False
-        #         break
 
         history.append(mykey)
 
@@ -284,13 +235,6 @@ def handlekey(key):
         if last:
             if not last.forwarded:
                 towrite = False
-        # TODO: needs to be optimized
-        # for histkey in reversed(history):
-        #     if histkey.keycode == keycode:
-        #         histkey.keystate = "hold"
-        #         if not histkey.forwarded:
-        #             towrite = False
-        #         break
 
         history.append(mykey)
 
@@ -401,9 +345,6 @@ def main():
     except (KeyboardInterrupt, SystemExit, OSError) as e:
         print('exiting')
         myexit()
-    # except Exception as e:
-    #     print(e)
-    #     myexit()
 
     print('exiting2')
     myexit()
