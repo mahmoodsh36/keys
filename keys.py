@@ -1,6 +1,8 @@
+import subprocess
+import argparse
+import traceback
 import evdev
 from evdev import UInput, ecodes as e
-import subprocess
 
 from utils import *
 from config import *
@@ -8,17 +10,12 @@ from config import *
 MAX_HIST_SIZE = 150
 
 kbd_path = '/dev/input/event0'
-try:
-    kbd_path = subprocess.check_output("libinput_find_keyboard.sh", shell=True).decode().strip()
-    print(f'got path {kbd_path}')
-except:
-    pass
+kbd_path = find_kbd()
 
 # for injecting keys/events
 ui = UInput()
 # for capturing manual input
 device = evdev.InputDevice(kbd_path)
-print("using device " + device.path + ' ' + device.name)
 
 # key press history
 history = []
@@ -145,14 +142,16 @@ class KeySequence():
 def writeseq(seq):
     from time import sleep
     held = []
-    prev = None
+
+    # we need to syn() and wait, otherwise first key wont be invoked..
+    ui.syn()
+    sleep(0.05)
+
     for key in seq:
-        is_prev_mod = prev and ismod(prev)
         code_towrite = e.ecodes[unnormalize(key)]
         if ismod(key):
             ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
             held.append(key)
-            ui.syn()
         else:
             ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
             ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
@@ -161,10 +160,9 @@ def writeseq(seq):
                          e.ecodes[unnormalize(heldkey)],
                          evdev.events.KeyEvent.key_up)
             held = []
-            ui.syn()
-        rev = key
+        ui.syn()
         # is this necessary to let apps process things?
-        sleep(0.1)
+        sleep(0.05)
 
 def write_raw_seq(seq):
     from time import sleep
@@ -326,7 +324,7 @@ def myexit():
     ui.close()
     exit(0)
 
-def main():
+def daemon():
     # exclusive access to device
     device.grab()
 
@@ -340,9 +338,32 @@ def main():
     except (KeyboardInterrupt, SystemExit, OSError) as e:
         print('exiting')
         myexit()
+    except Exception as e:
+        traceback.print_tb(e.__traceback__)
+        myexit()
 
-    print('exiting2')
     myexit()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(
+        prog='keys.py',
+        description='rebind keys',
+        epilog='thank you')
+
+    parser.add_argument('-i', '--invoke', help='invoke the given key sequence')
+    parser.add_argument('-d', '--daemon',
+                        action='store_true')
+    parser.add_argument('-pk', '--print_kbd',
+                        action='store_true')
+
+    args = parser.parse_args()
+
+    if args.invoke:
+        writeseq(eval(args.invoke))
+
+    if args.print_kbd:
+        print(find_kbd())
+
+    if args.daemon:
+        print('starting daemon')
+        daemon()
