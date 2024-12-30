@@ -5,7 +5,7 @@ import subprocess
 from utils import *
 from config import *
 
-MAX_HIST_SIZE = 250
+MAX_HIST_SIZE = 150
 
 kbd_path = '/dev/input/event0'
 try:
@@ -133,7 +133,7 @@ class KeySequence():
                 print('reloading config')
                 reload()
             elif isinstance(self.action, list):
-                print('invoking sequence ', self.action)
+                # print('invoking sequence ', self.action)
                 writeseq(self.action)
             else:
                 self.action()
@@ -223,10 +223,11 @@ def handlekey(key):
         mykey.keystate = "up"
         last = last_occur(mykey.code())
         if last:
+            # if we're received "upped" keys after having releasing a trapped
+            # sequence we should write those to release the keys because we dont want
+            # the forwarded keys to stay "down" (for that we use after_trap).
             if not last.forwarded and not last in trapped and not after_trap:
                 towrite = False
-
-        history.append(mykey)
 
     # handle key hold
     if keystate == evdev.events.KeyEvent.key_hold:
@@ -235,8 +236,6 @@ def handlekey(key):
         if last:
             if not last.forwarded:
                 towrite = False
-
-        history.append(mykey)
 
     # handle key down
     if keystate == evdev.events.KeyEvent.key_down:
@@ -278,7 +277,7 @@ def handlekey(key):
                 if newseq.progress(mykey) == 1:
                     active.append(newseq)
 
-        history.append(mykey)
+    history.append(mykey)
 
     if not mykey.forwarded:
         towrite = False
@@ -301,17 +300,13 @@ def handlekey(key):
     if trapped and not active: # and mykey.keystate == 'up' and all_up():
         seqtowrite = []
         start_idx = len(history)
-        # end_idx = 0
         for trapped_key in trapped:
             for i, histkey in enumerate(history):
                 if trapped_key == histkey:
                     if i < start_idx:
                         start_idx = i
-                    # if i > end_idx:
-                    #     end_idx = i
-        print('forwarding trapped sequence')
-        # print([key.code() for key in trapped])
-        print([(key.code(), key.keystate) for key in history[start_idx:]])
+        # print('forwarding trapped sequence')
+        # print([(key.code(), key.keystate) for key in history[start_idx:]])
         write_raw_seq([key for key in history[start_idx:]])
         trapped = []
         after_trap = True
