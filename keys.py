@@ -24,6 +24,7 @@ print("using device " + device.path + ' ' + device.name)
 history = []
 active = []
 trapped = []
+after_trap = False
 
 def normalize(code):
     """normalize the code of a key"""
@@ -219,11 +220,19 @@ def write_raw_seq(seq):
     # is this necessary to let apps process things?
     # sleep(0.05)
 
+def all_up():
+    for histkey in reversed(history):
+        last = last_occur(histkey.code())
+        if last.keystate != 'up':
+            return False
+    return True
+
 def handlekey(key):
     """main function that handles each key event"""
     global active
     global history
     global trapped
+    global after_trap
 
     keystate = key.keystate
     keycode = key.keycode
@@ -242,10 +251,12 @@ def handlekey(key):
 
     # handle key up
     if keystate == evdev.events.KeyEvent.key_up:
+        if all_up():
+            after_trap = False
         mykey.keystate = "up"
         last = last_occur(mykey.code())
         if last:
-            if not last.forwarded and not last in trapped:
+            if not last.forwarded and not last in trapped and not after_trap:
                 towrite = False
         # for histkey in reversed(history):
         #     if histkey.keycode == keycode:
@@ -333,12 +344,7 @@ def handlekey(key):
     # other apps can make use of the same patterns and modifiers (but not the
     # exact same keybindings ofc.)
     # is all_up necessary?
-    all_up = True
-    for histkey in reversed(history):
-        last = last_occur(histkey.code())
-        if last.keystate != 'up':
-            all_up = False
-    if trapped and not active and mykey.keystate == 'up' and all_up:
+    if trapped and not active: # and mykey.keystate == 'up' and all_up():
         seqtowrite = []
         start_idx = len(history)
         # end_idx = 0
@@ -354,6 +360,7 @@ def handlekey(key):
         print([(key.code(), key.keystate) for key in history[start_idx:]])
         write_raw_seq([key for key in history[start_idx:]])
         trapped = []
+        after_trap = True
 
     history = history[-MAX_HIST_SIZE:]
 
