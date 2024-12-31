@@ -7,6 +7,8 @@ from evdev import UInput, ecodes as e
 from utils import *
 from config import *
 
+SYNC_DELAY = 0.03
+
 MAX_HIST_SIZE = 150
 
 kbd_path = '/dev/input/event0'
@@ -144,17 +146,28 @@ def writeseq(seq):
     held = []
 
     # we need to syn() and wait, otherwise first key wont be invoked..
+    # although this may only be needed once when the first key is to be inserted
     ui.syn()
-    sleep(0.05)
+    sleep(SYNC_DELAY)
 
     for key in seq:
-        code_towrite = e.ecodes[unnormalize(key)]
         if ismod(key):
+            code_towrite = e.ecodes[unnormalize(key)]
             ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
             held.append(key)
         else:
-            ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
-            ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
+            if 'down(' in key:
+                code = unnormalize(key[5:-1])
+                code_towrite = e.ecodes[code]
+                ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
+            elif 'up(' in key:
+                code = unnormalize(key[3:-1])
+                code_towrite = e.ecodes[code]
+                ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
+            else:
+                code_towrite = e.ecodes[unnormalize(key)]
+                ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
+                ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
             for heldkey in held:
                 ui.write(e.EV_KEY,
                          e.ecodes[unnormalize(heldkey)],
@@ -162,7 +175,7 @@ def writeseq(seq):
             held = []
         ui.syn()
         # is this necessary to let apps process things?
-        sleep(0.05)
+        sleep(SYNC_DELAY)
 
 def write_raw_seq(seq):
     from time import sleep
@@ -177,7 +190,7 @@ def write_raw_seq(seq):
         ui.write(e.EV_KEY, code_towrite, event_towrite)
         ui.syn()
     # is this necessary to let apps process things?
-    # sleep(0.05)
+    # sleep(SYNC_DELAY)
 
 def all_up():
     for histkey in reversed(history):
