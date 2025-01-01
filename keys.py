@@ -3,7 +3,7 @@ import argparse
 import traceback
 import evdev
 from evdev import UInput, ecodes as e
-from time import sleep
+from time import sleep, time
 
 from utils import *
 from config import *
@@ -11,6 +11,7 @@ from ipc import *
 
 SYNC_DELAY = 0.03
 MAX_HIST_SIZE = 150
+LOG_FILE = '/tmp/keys.py.log'
 
 keyhandler = None
 
@@ -263,10 +264,13 @@ class KeyHandler:
         if not mykey.forwarded and not was_handled:
             self.trapped.append(mykey)
 
-        print(towrite, code_towrite, mykey.keystate)
         if towrite:
             self.ui.write(e.EV_KEY, code_towrite, other_keystate_from_str(mykey.keystate))
             self.ui.syn()
+
+            # log it
+            with open(LOG_FILE, "a+") as f:
+                f.write(f"{time()} {mykey.keystate}({mykey.code()})\n")
 
         # if something was done, dispose the trapped sequence
         if was_handled:
