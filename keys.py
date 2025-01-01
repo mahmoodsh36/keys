@@ -122,14 +122,13 @@ class KeySequence():
                 reload()
             elif isinstance(self.action, list):
                 # print('invoking sequence ', self.action)
-                self.writeseq(self.action)
+                keyhandler.writeseq(self.action)
             else:
                 self.action()
             return 2
 
         # return true to let this sequence continue progressing
         return 1
-
 
 def all_up():
     for histkey in reversed(keyhandler.history):
@@ -164,9 +163,21 @@ def other_to_mykey(key):
     keystate = key.keystate
     keycode = key.keycode
     scancode = key.scancode
+    return other_properties_to_mykey(keycode, scancode, keystate)
+    # strstate = str_keystate_from_other(keystate)
+    # mykey = MyKey(keycode, scancode, strstate)
+    # return mykey
+
+def other_properties_to_mykey(keycode, scancode, keystate):
     strstate = str_keystate_from_other(keystate)
     mykey = MyKey(keycode, scancode, strstate)
     return mykey
+
+def mykey_to_other(mykey):
+    keystate = other_keystate_from_str(mykey.keystate)
+    keycode = key.keycode
+    scancode = e.ecodes[keycode]
+    return keycode, scancode, keystate
 
 class KeyHandler:
     def __init__(self, device, ui):
@@ -306,40 +317,91 @@ class KeyHandler:
             traceback.print_tb(e.__traceback__)
             myexit()
 
-    def writeseq(self, seq, follow_rules=True):
+    def writeseq(self, seq, through_handler=False):
         held = []
 
         # we need to syn() and wait, otherwise first key wont be invoked..
         # although this may only be needed once when the first key is to be inserted
-        self.ui.syn()
-        sleep(SYNC_DELAY)
+        if not through_handler:
+            self.ui.syn()
+            sleep(SYNC_DELAY)
 
         for key in seq:
             if ismod(key):
                 code_towrite = e.ecodes[unnormalize(key)]
-                self.ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
+                if through_handler:
+                    mykey = other_properties_to_mykey(unnormalize(key),
+                                                      code_towrite,
+                                                      evdev.events.KeyEvent.key_down)
+                    self.handlekey(mykey)
+                else:
+                    self.ui.write(e.EV_KEY,
+                                  code_towrite,
+                                  evdev.events.KeyEvent.key_down)
                 held.append(key)
             else:
                 if 'down(' in key:
                     code = unnormalize(key[5:-1])
                     code_towrite = e.ecodes[code]
-                    self.ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
+                    if through_handler:
+                        mykey = other_properties_to_mykey(
+                            code,
+                            code_towrite,
+                            evdev.events.KeyEvent.key_down)
+                        self.handlekey(mykey)
+                    else:
+                        self.ui.write(e.EV_KEY,
+                                      code_towrite,
+                                      evdev.events.KeyEvent.key_down)
                 elif 'up(' in key:
                     code = unnormalize(key[3:-1])
                     code_towrite = e.ecodes[code]
-                    self.ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
+                    if through_handler:
+                        mykey = other_properties_to_mykey(
+                            code,
+                            code_towrite,
+                            evdev.events.KeyEvent.key_up)
+                        self.handlekey(mykey)
+                    else:
+                        self.ui.write(e.EV_KEY,
+                                      code_towrite,
+                                      evdev.events.KeyEvent.key_up)
                 else:
                     code_towrite = e.ecodes[unnormalize(key)]
-                    self.ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_down)
-                    self.ui.write(e.EV_KEY, code_towrite, evdev.events.KeyEvent.key_up)
+                    if through_handler:
+                        mykey1 = other_properties_to_mykey(
+                            unnormalize(key),
+                            code_towrite,
+                            evdev.events.KeyEvent.key_down)
+                        mykey2 = other_properties_to_mykey(
+                            unnormalize(key),
+                            code_towrite,
+                            evdev.events.KeyEvent.key_up)
+                        self.handlekey(mykey1)
+                        self.handlekey(mykey2)
+                    else:
+                        self.ui.write(e.EV_KEY,
+                                      code_towrite,
+                                      evdev.events.KeyEvent.key_down)
+                        self.ui.write(e.EV_KEY,
+                                      code_towrite,
+                                      evdev.events.KeyEvent.key_up)
                 for heldkey in held:
-                    self.ui.write(e.EV_KEY,
-                                  e.ecodes[unnormalize(heldkey)],
-                                  evdev.events.KeyEvent.key_up)
+                    if through_handler:
+                        mykey = other_properties_to_mykey(
+                            unnormalize(heldkey),
+                            e.ecodes[unnormalize(heldkey)],
+                            evdev.events.KeyEvent.key_up)
+                        self.handlekey(mykey)
+                    else:
+                        self.ui.write(e.EV_KEY,
+                                      e.ecodes[unnormalize(heldkey)],
+                                      evdev.events.KeyEvent.key_up)
                 held = []
-            self.ui.syn()
-            # is this necessary to let apps process things?
-            sleep(SYNC_DELAY)
+            if not through_handler:
+                self.ui.syn()
+                # is this necessary to let apps process things?
+                sleep(SYNC_DELAY)
 
     def write_raw_seq(self, seq, follow_rules=True):
         for key in seq:
@@ -362,10 +424,11 @@ def reload():
     from config import bindings, remaps
 
 def myexit():
-    if keyhandler.device:
-        keyhandler.device.ungrab()
-    if keyhandler.ui:
-        keyhandler.ui.close()
+    if keyhandler:
+        if keyhandler.device:
+            keyhandler.device.ungrab()
+        if keyhandler.ui:
+            keyhandler.ui.close()
     exit(0)
 
 def daemon():
@@ -389,6 +452,11 @@ if __name__ == '__main__':
 
     parser.add_argument('-i', '--invoke',
                         help='invoke the given key sequence')
+    parser.add_argument('-th', '--through_handler',
+                        action='store_true',
+                        help="""to be used with --invoke, to invoke the keys through
+                        the handler, so that special keybindings may be handled
+                        properly""")
     parser.add_argument('-k', '--sendkeys',
                         help='send keys to be handled by the main daemon')
     parser.add_argument('-d', '--daemon',
@@ -405,7 +473,10 @@ if __name__ == '__main__':
 
     if args.invoke:
         keyhandler = KeyHandler(None, UInput())
-        keyhandler.writeseq(eval(args.invoke))
+        if args.through_handler:
+            keyhandler.writeseq(eval(args.invoke), through_handler=True)
+        else:
+            keyhandler.writeseq(eval(args.invoke))
 
     if args.print_kbd:
         print(find_kbd())
@@ -418,8 +489,10 @@ if __name__ == '__main__':
         print('monitoring')
 
     if args.sendkeys:
-        # ui = UInput()
-        # writeseq(eval(args.sendkeys))
+        # keyhandler = KeyHandler(None, UInput())
+        # keyhandler.writeseq(eval(args.invoke))
+        if args.through_handler:
+            pass
         print('hey there')
 
     myexit()
