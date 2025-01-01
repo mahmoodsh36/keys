@@ -268,9 +268,9 @@ class KeyHandler:
             self.ui.write(e.EV_KEY, code_towrite, other_keystate_from_str(mykey.keystate))
             self.ui.syn()
 
-            # log it
-            with open(LOG_FILE, "a+") as f:
-                f.write(f"{time()} {mykey.keystate}({mykey.code()})\n")
+        # log it
+        with open(LOG_FILE, "a+") as f:
+            f.write(f"{time()} {mykey.keystate}({mykey.code()})\n")
 
         # if something was done, dispose the trapped sequence
         if was_handled:
