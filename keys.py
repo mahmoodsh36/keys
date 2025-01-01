@@ -263,6 +263,7 @@ class KeyHandler:
         if not mykey.forwarded and not was_handled:
             self.trapped.append(mykey)
 
+        print(towrite, code_towrite, mykey.keystate)
         if towrite:
             self.ui.write(e.EV_KEY, code_towrite, other_keystate_from_str(mykey.keystate))
             self.ui.syn()
@@ -322,9 +323,9 @@ class KeyHandler:
 
         # we need to syn() and wait, otherwise first key wont be invoked..
         # although this may only be needed once when the first key is to be inserted
-        if not through_handler:
-            self.ui.syn()
-            sleep(SYNC_DELAY)
+        # if not through_handler:
+        self.ui.syn()
+        sleep(SYNC_DELAY)
 
         for key in seq:
             if ismod(key):
@@ -398,10 +399,10 @@ class KeyHandler:
                                       e.ecodes[unnormalize(heldkey)],
                                       evdev.events.KeyEvent.key_up)
                 held = []
-            if not through_handler:
-                self.ui.syn()
-                # is this necessary to let apps process things?
-                sleep(SYNC_DELAY)
+            # if not through_handler:
+            self.ui.syn()
+            # is this necessary to let apps process things?
+            sleep(SYNC_DELAY)
 
     def write_raw_seq(self, seq, follow_rules=True):
         for key in seq:
