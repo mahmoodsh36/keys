@@ -371,6 +371,19 @@ class KeyHandler:
                         self.ui.write(e.EV_KEY,
                                       code_towrite,
                                       evdev.events.KeyEvent.key_up)
+                elif 'hold(' in key:
+                    code = unnormalize(key[5:-1])
+                    code_towrite = e.ecodes[code]
+                    if through_handler:
+                        mykey = other_properties_to_mykey(
+                            code,
+                            code_towrite,
+                            evdev.events.KeyEvent.key_hold)
+                        self.handlekey(mykey)
+                    else:
+                        self.ui.write(e.EV_KEY,
+                                      code_towrite,
+                                      evdev.events.KeyEvent.key_hold)
                 else:
                     code_towrite = e.ecodes[unnormalize(key)]
                     if through_handler:
