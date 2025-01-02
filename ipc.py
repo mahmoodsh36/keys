@@ -18,7 +18,7 @@ def client(message):
     data = s.recv(1024)
     print(f'Received bytes: {repr(data)}')
 
-def server():
+def server(keyhandler):
     if os.path.exists(SOCK_FILE):
         os.remove(SOCK_FILE)
 
@@ -28,16 +28,22 @@ def server():
 
     while True:
         conn, addr = s.accept()
-        print('Connection by client')
         all = []
+        SIZE = 1024
         while True:
             data = conn.recv(1024)
             if not data:
                 break
             all.append(data)
-        print(all)
+            if len(data) < SIZE:
+                break
+        msg = ''.join(item.decode() for item in all)
+        if msg.startswith('writeseq'):
+            seq = eval(msg[len("writeseq"):])
+            keyhandler.writeseq(seq, through_handler=True)
+        conn.send(b'ok')
 
-def start_server():
-    thread = threading.Thread(target=server, args=())
+def start_server(keyhandler):
+    thread = threading.Thread(target=server, args=(keyhandler,))
     thread.daemon = True
     thread.start()

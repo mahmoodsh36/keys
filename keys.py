@@ -451,8 +451,6 @@ def myexit():
 
 def daemon():
     global keyhandler
-    # start ipc server
-    start_server()
     # kbd_path = '/dev/input/event0'
     kbd_path = find_kbd()
     device = evdev.InputDevice(kbd_path)
@@ -460,6 +458,9 @@ def daemon():
     ui = UInput()
     # our main keyhandler
     keyhandler = KeyHandler(device, ui)
+    # start ipc server
+    start_server(keyhandler)
+    # grab device and start handling keys
     keyhandler.grab_device()
 
 if __name__ == '__main__':
@@ -475,6 +476,10 @@ if __name__ == '__main__':
                         help="""to be used with --invoke, to invoke the keys through
                         the handler, so that special keybindings may be handled
                         properly""")
+    parser.add_argument('-td', '--through_daemon',
+                        action='store_true',
+                        help="""to be used with --invoke, to send the keys to the
+                        daemon for it to invoke.""")
     parser.add_argument('-k', '--sendkeys',
                         help='send keys to be handled by the main daemon')
     parser.add_argument('-d', '--daemon',
@@ -486,15 +491,23 @@ if __name__ == '__main__':
     parser.add_argument('-pk', '--print_kbd',
                         action='store_true',
                         help='show keyboard device location under /dev/input')
+    parser.add_argument('-s', '--send',
+                        help="send a message to the daemon")
 
     args = parser.parse_args()
 
     if args.invoke:
         keyhandler = KeyHandler(None, UInput())
-        if args.through_handler:
-            keyhandler.writeseq(eval(args.invoke), through_handler=True)
+        if args.through_daemon:
+            client('writeseq ' + args.invoke)
         else:
-            keyhandler.writeseq(eval(args.invoke))
+            if args.through_handler:
+                keyhandler.writeseq(eval(args.invoke), through_handler=True)
+            else:
+                keyhandler.writeseq(eval(args.invoke))
+
+    if args.send:
+        client(args.send)
 
     if args.print_kbd:
         print(find_kbd())
