@@ -81,7 +81,13 @@ class KeySequence():
                     return self.progress(key)
                 return 0
             else:
+                # if the modifier key is the first key in the sequence, we choose
+                # to forward and discord it to allow things like super+mouse-move
+                # to work, otherwise we dont forward it
                 key.forwarded = False
+                if self.progress_idx == 0:
+                    key.forwarded = True
+                    return False
         elif key.code() != expected:
             if self.progress_idx > 0:
                 key.forwarded = False
