@@ -5,10 +5,10 @@ bindings = [
         "sequence": [mod("leftmeta"), "enter"],
         "action": lambda: run_cmd('wezterm'),
     },
-    {
-        "sequence": [mod("leftmeta"), "x", "c", "1"],
-        "action": lambda: print('reached 1'),
-    },
+    # {
+    #     "sequence": [mod("leftmeta"), "x", "c", "1"],
+    #     "action": lambda: print('reached 1'),
+    # },
     {
         "sequence": ["mod(leftmeta)", "r"],
         "action": lambda: run_cmd('run.sh'),
@@ -46,13 +46,23 @@ bindings = [
         "action": lambda: run_cmd(""" HYPRLAND_INSTANCE_SIGNATURE=$(hyprctl instances | head -1 | cut -d " " -f2 | tr -d ":") sh -c "cd ~/work/widgets; nix-shell --run \\"python bar.py\\"" """),
     },
     {
-        "sequence": ["mod(leftmeta)", "x", "r"],
-        "action": "reload",
-    },
-    {
         "sequence": ["mod(leftmeta)", "x", "t"],
         "action": [mod("leftctrl"), "c", "h", "e", "l", "l", "o"],
     },
+    {
+        "sequence": [mod("leftmeta"), "x", "c"],
+        "action": lambda: run_cmd('codium'),
+    },
+    {
+        "sequence": [mod("leftmeta"), "x", "x"],
+        "action": lambda: run_cmd('xournalpp'),
+    },
+
+    {
+        "sequence": ["mod(leftmeta)", "x", "r"],
+        "action": "reload",
+    },
+
     {
         "sequence": ["rightshift"],
         "action": [mod("leftctrl"), "space"],

@@ -326,6 +326,7 @@ class KeyHandler:
             myexit()
         except Exception as e:
             traceback.print_tb(e.__traceback__)
+            print(e)
             myexit()
 
     def writeseq(self, seq, through_handler=False):
@@ -444,8 +445,10 @@ class KeyHandler:
 def reload():
     import importlib
     import config
-    importlib.reload(config)
-    from config import bindings, remaps
+    config = importlib.reload(config)
+    global bindings, remaps
+    bindings = config.bindings
+    remaps = config.remaps
 
 def myexit():
     if keyhandler:
