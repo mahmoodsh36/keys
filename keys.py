@@ -533,6 +533,5 @@ if __name__ == '__main__':
         # keyhandler.writeseq(eval(args.invoke))
         if args.through_handler:
             pass
-        print('hey there')
 
     myexit()
