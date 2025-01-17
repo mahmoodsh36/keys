@@ -97,6 +97,8 @@ class KeySequence():
 
         # if its not a modifier key, we check if it requires a modifier key
         # and if so we check whether that modifier key is still active (held)
+        # we also need to check that no other modifier keys that arent in the
+        # sequence are active
         if not ismod(expected) and self.progress_idx > 0:
             i = 1
             prev = self.sequence[self.progress_idx - i]
@@ -105,6 +107,13 @@ class KeySequence():
                     last = last_occur(unmod(prev))
                     if last and not last.is_held():
                         return 0
+                    # check if a modifier key is being held when it shouldnt be
+                    # this could be optimized..
+                    for histkey in reversed(keyhandler.history):
+                        if histkey.code() not in [unmod(other_prev) for other_prev in self.sequence[:self.progress_idx]]:
+                            last = last_occur(histkey.code())
+                            if last.is_held():
+                                return False
                     i += 1
                     prev = self.sequence[self.progress_idx - i]
                 key.forwarded = False
