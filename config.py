@@ -42,7 +42,7 @@ bindings = [
         # "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t | sxiv -i'),
         # "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t --color=no | xargs imv'),
         "action": lambda: subprocess.Popen(
-            f"su mahmooz -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland XDG_RUNTIME_DIR=/run/user/1000 imv /home/mahmooz/brain/out'",
+            f"su mahmooz -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland XDG_RUNTIME_DIR=/run/user/1000 sh -c \"cd ~/data/images/scrots/; ls -t --color=no | xargs imv\"'",
             shell=True,
             start_new_session=True
         )
@@ -63,7 +63,16 @@ bindings = [
         "sequence": [mod("leftmeta"), "x", "x"],
         "action": lambda: run_cmd('xournalpp'),
     },
+    {
+        "sequence": [mod("leftmeta"), "p"],
+        "action": lambda: run_cmd('myscrot.sh'),
+    },
+    {
+        "sequence": [mod("leftmeta"), mod("leftshift"), "p"],
+        "action": lambda: run_cmd('myscrot.sh 1'),
+    },
 
+    # reload keybindings from config.py
     {
         "sequence": ["mod(leftmeta)", "x", "r"],
         "action": "reload",
