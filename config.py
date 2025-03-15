@@ -5,6 +5,10 @@ bindings = [
         "sequence": [mod("leftmeta"), "enter"],
         "action": lambda: run_cmd('wezterm'),
     },
+    {
+        "sequence": [mod("leftmeta"), mod("leftshift"), "enter"],
+        "action": lambda: run_cmd('wezterm connect mahmooz2'),
+    },
     # {
     #     "sequence": [mod("leftmeta"), "x", "c", "1"],
     #     "action": lambda: print('reached 1'),
@@ -70,6 +74,14 @@ bindings = [
     {
         "sequence": [mod("leftmeta"), mod("leftshift"), "p"],
         "action": lambda: run_cmd('myscrot.sh 1'),
+    },
+    {
+        "sequence": [mod("leftmeta"), "x", "j"],
+        "action": lambda: run_cmd('jellyfinmediaplayer'),
+    },
+    {
+        "sequence": [mod("leftmeta"), "x", "l"],
+        "action": lambda: run_cmd('lem'),
     },
 
     # reload keybindings from config.py

@@ -87,7 +87,7 @@ class KeySequence():
                 key.forwarded = False
                 if self.progress_idx == 0:
                     key.forwarded = True
-                    return False
+                    return 0
         elif key.code() != expected:
             if self.progress_idx > 0:
                 key.forwarded = False
@@ -113,7 +113,7 @@ class KeySequence():
                         if histkey.code() not in [unmod(other_prev) for other_prev in self.sequence[:self.progress_idx]]:
                             last = last_occur(histkey.code())
                             if last.is_held():
-                                return False
+                                return 0
                     i += 1
                     prev = self.sequence[self.progress_idx - i]
                 key.forwarded = False
@@ -131,7 +131,7 @@ class KeySequence():
         self.progress_idx += 1
 
         # if we have reached the end of the sequence, execute the destined action
-        # and return False to get the sequence removed.
+        # and return 0 to get the sequence removed.
         if self.progress_idx == len(self.sequence):
             if self.action == "reload":
                 print('reloading config')
@@ -141,6 +141,7 @@ class KeySequence():
                 keyhandler.writeseq(self.action)
             else:
                 self.action()
+            # key.forwarded = False # we shouldnt forward key if it satisfied a keybinding
             return 2
 
         # return true to let this sequence continue progressing
@@ -208,6 +209,11 @@ class KeyHandler:
     def handlekey(self, mykey):
         # handle key remapping
         code_towrite = mykey.scancode
+        # we sometimes get a list like ['KEY_MIN_INTERESTING', 'KEY_MUTE'] for
+        # the keycode, for now we ignore those to avoid crashing
+        if not isinstance(mykey.keycode, str):
+            print('received unidentified/pathological key')
+            return True
         for remap in remaps:
             if normalize(mykey.keycode) == remap['src']:
                 code_towrite = e.ecodes[unnormalize(remap['dest'])]
