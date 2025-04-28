@@ -6,27 +6,39 @@ from os.path import join
 def run_cmd(cmd):
     username = 'mahmooz'
 
-    old_env = os.environ.copy()
-    env = {}
-    defaults = {
-        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus",
-        "WAYLAND_DISPLAY": "wayland-1",
-        "GDK_BACKEND": "wayland",
-        "XDG_RUNTIME_DIR": "/run/user/1000",
-        "PATH": old_env['PATH']
-    }
-    for key, value in defaults.items():
-        env.setdefault(key, value)
+    # vars_to_inherit = [] # 'PATH'
+    #
+    # old_env = os.environ.copy()
+    # # env = old_env
+    # env = {}
+    # defaults = {
+    #     "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus",
+    #     "WAYLAND_DISPLAY": "wayland-1",
+    #     "GDK_BACKEND": "wayland",
+    #     "XDG_RUNTIME_DIR": "/run/user/1000",
+    #     "XDG_DATA_HOME": f"/home/{username}/.local/share",
+    #     "XDG_CACHE_HOME": f"/home/{username}/.cache",
+    #     "XDG_CONFIG_HOME": f"/home/{username}/.config",
+    #     "XDG_STATE_HOME": f"/home/{username}/.local/state",
+    #     "USER": username,
+    #     "HOME": f"/home/{username}",
+    #     "PATH": f"{old_env['PATH']}:/home/{username}/.local/bin",
+    # }
+    # for key, value in defaults.items():
+    #     env.setdefault(key, value)
+    # for key in vars_to_inherit:
+    #     env.setdefault(key, old_env[key])
 
     with open(os.devnull, 'wb') as dn:
         subprocess.Popen(
-            cmd,
+            ['sudo', 'su', username, '-c',
+             'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland XDG_RUNTIME_DIR=/run/user/1000 ' + cmd],
             # stdout=dn, stderr=dn, stdin=dn,
             start_new_session=True,
             # close_fds=True,
-            env=env,
-            shell=True,
-            user='mahmooz',
+            # env=env,
+            # shell=True,
+            user=username,
         )
 
 def mod(key):

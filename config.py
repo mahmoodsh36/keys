@@ -35,7 +35,7 @@ bindings = [
     },
     {
         "sequence": ["mod(leftmeta)", "x", "o"],
-        "action": lambda: run_cmd('terminal_with_cmd.sh top'),
+        "action": lambda: run_cmd('terminal_with_cmd.sh glances'),
     },
     {
         "sequence": ["mod(leftmeta)", "x", "p"],

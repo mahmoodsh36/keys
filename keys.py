@@ -479,7 +479,7 @@ def daemon():
     kbd_path = find_kbd()
     device = evdev.InputDevice(kbd_path)
     # for writing keys
-    ui = UInput()
+    ui = UInput(name='virtual kbd')
     # our main keyhandler
     keyhandler = KeyHandler(device, ui)
     # start ipc server
@@ -521,7 +521,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.invoke:
-        keyhandler = KeyHandler(None, UInput())
+        keyhandler = KeyHandler(None, UInput(name='virtual kbd'))
         if args.through_daemon:
             client('writeseq ' + args.invoke)
         else:
@@ -544,7 +544,7 @@ if __name__ == '__main__':
         print('monitoring')
 
     if args.sendkeys:
-        # keyhandler = KeyHandler(None, UInput())
+        # keyhandler = KeyHandler(None, UInput(name='virtual kbd'))
         # keyhandler.writeseq(eval(args.invoke))
         if args.through_handler:
             pass
