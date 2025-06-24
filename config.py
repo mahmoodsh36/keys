@@ -46,7 +46,7 @@ bindings = [
         # "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t | sxiv -i'),
         # "action": lambda: run_cmd('cd ~/data/images/scrots/; ls -t --color=no | xargs imv'),
         "action": lambda: subprocess.Popen(
-            f"su mahmooz -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland XDG_RUNTIME_DIR=/run/user/1000 sh -c \"cd ~/data/images/scrots/; ls -t --color=no | xargs imv\"'",
+            f"su mahmooz -c 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland XDG_RUNTIME_DIR=/run/user/1000 sh -c \"cd ~/data/images/scrots/; ls -t --color=no | imv -d\"'",
             shell=True,
             start_new_session=True
         )

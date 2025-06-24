@@ -473,10 +473,10 @@ def myexit():
             keyhandler.ui.close()
     exit(0)
 
-def daemon():
+def daemon(kbd_path=find_kbd()):
     global keyhandler
+    print(f'keyboard path: {kbd_path}')
     # kbd_path = '/dev/input/event0'
-    kbd_path = find_kbd()
     device = evdev.InputDevice(kbd_path)
     # for writing keys
     ui = UInput(name='virtual kbd')
@@ -517,6 +517,8 @@ if __name__ == '__main__':
                         help='show keyboard device location under /dev/input')
     parser.add_argument('-s', '--send',
                         help="send a message to the daemon")
+    parser.add_argument('-p', '--kbd-path',
+                        help="specify the path to the keyboard that should be captured")
 
     args = parser.parse_args()
 
@@ -538,7 +540,10 @@ if __name__ == '__main__':
 
     if args.daemon:
         print('starting daemon')
-        daemon()
+        if args.kbd_path:
+            daemon(args.kbd_path)
+        else:
+            daemon()
 
     if args.monitor:
         print('monitoring')
